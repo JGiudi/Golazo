@@ -1,37 +1,54 @@
 'use client';
 
+import { Home, Users, Calendar, Search } from 'lucide-react';
+import { motion } from 'motion/react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
-const items = [
-  { href: '/home', label: 'Inicio' },
-  { href: '/buscar', label: 'Buscar' },
-  { href: '/partidos', label: 'Partidos' },
-  { href: '/perfil', label: 'Perfil' },
-] as const;
-
-export function BottomNav() {
+export default function BottomNav() {
   const pathname = usePathname();
+  
+  // Convertimos las rutas al tab activo
+  const getActiveTab = () => {
+    if (pathname?.includes('/buscar')) return 'buscar';
+    if (pathname?.includes('/equipos')) return 'equipos';
+    if (pathname?.includes('/reservas')) return 'reservas';
+    return 'inicio';
+  };
+  
+  const activeTab = getActiveTab();
+
+  const tabs = [
+    { id: 'inicio', icon: Home, label: 'INICIO', href: '/home' },
+    { id: 'buscar', icon: Search, label: 'BUSCAR', href: '/buscar' },
+    { id: 'equipos', icon: Users, label: 'EQUIPOS', href: '/equipos' },
+    { id: 'reservas', icon: Calendar, label: 'RESERVAS', href: '/reservas' },
+  ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/10 bg-dark-surface/95 px-2 py-2 backdrop-blur-md md:hidden">
-      <ul className="mx-auto flex max-w-lg justify-between">
-        {items.map(({ href, label }) => {
-          const active = pathname === href;
-          return (
-            <li key={href}>
-              <Link
-                href={href}
-                className={`flex min-w-[4rem] flex-col items-center rounded-lg px-2 py-1 text-[10px] font-sans uppercase tracking-wide ${
-                  active ? 'text-electric-green' : 'text-gray-500'
-                }`}
-              >
-                {label}
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
-    </nav>
+    <div className="pb-8 pt-4 px-6 bg-linear-to-t from-bg via-bg/95 to-bg/80 backdrop-blur-xl border-t border-white/5 rounded-t-[32px]">
+      <div className="flex justify-between items-center px-2">
+        {tabs.map((tab) => (
+          <Link
+            key={tab.id}
+            href={tab.href}
+            className="flex flex-col items-center gap-1.5 min-w-[56px] relative"
+          >
+            <tab.icon 
+              className={`w-5 h-5 transition-all duration-300 ${activeTab === tab.id ? 'text-brand scale-110 drop-shadow-[0_0_8px_rgba(0,230,118,0.5)]' : 'text-gray-500'}`} 
+            />
+            <span className={`text-[8px] font-black tracking-[0.2em] transition-colors ${activeTab === tab.id ? 'text-brand' : 'text-gray-600'}`}>
+              {tab.label}
+            </span>
+            {activeTab === tab.id && (
+              <motion.div 
+                layoutId="nav-glow-indicator"
+                className="absolute -top-1 w-10 h-10 bg-brand/10 blur-xl rounded-full -z-10"
+              />
+            )}
+          </Link>
+        ))}
+      </div>
+    </div>
   );
 }

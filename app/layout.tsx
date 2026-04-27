@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Bebas_Neue, DM_Sans } from 'next/font/google';
 
 import './globals.css';
+import { AppProvider } from '@/lib/context';
 
 const bebasNeue = Bebas_Neue({
   weight: '400',
@@ -21,6 +22,8 @@ export const metadata: Metadata = {
   description: 'Organizá partidos, canchas y tu equipo.',
 };
 
+import SplashScreen from '@/components/shared/SplashScreen';
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -28,7 +31,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es" className={`${bebasNeue.variable} ${dmSans.variable}`}>
-      <body>{children}</body>
+      <body>
+        <AppProvider>
+          <SplashScreen />
+          {children}
+        </AppProvider>
+      </body>
     </html>
   );
 }

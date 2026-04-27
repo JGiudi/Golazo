@@ -7,5 +7,23 @@
 }
 
 body {
-  @apply bg-pitch-black text-white font-sans antialiased;
+  @apply bg-bg text-white font-sans antialiased;
+}
+
+/* Utilities portadas del front (sin Tailwind v4 @theme) */
+.neon-glow {
+  box-shadow: 0 0 15px rgba(0, 230, 118, 0.4);
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.text-gradient {
+  @apply bg-clip-text text-transparent;
+  background-image: linear-gradient(90deg, theme(colors.electric-green), #22d3ee);
 }
