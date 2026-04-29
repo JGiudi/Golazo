@@ -63,4 +63,4 @@ Cuando se te pida crear una de estas rutas, estructúrala en `app/(player)/...` 
 ---
 
 ### 📝 Prompt de ejemplo para alimentar a la IA:
-*"Actúa como un desarrollador experto en Next.js y TailwindCSS. Revisa el archivo `FRONTEND_GUIDELINES.md` del repositorio. Tu tarea es implementar la pantalla de 'Notificaciones' en `app/(player)/perfil/notificaciones/page.tsx` usando los estilos de UI oscuros, tipografía Bebas Neue en itálica y el Header con variant='back'."*
+*"Actúa como un desarrollador experto en Next.js y TailwindCSS. Revisa el archivo `FRONTEND_GUIDELINES.md` del repositorio. Tu tarea es implementar la pantalla de 'Notificaciones' en `app/(player)/perfil/notificaciones/page.tsx` (no hace falta si no saben, prefiero que no tiren verdura y que lo resuelva la IA) usando los estilos de UI oscuros, tipografía Bebas Neue en itálica y el Header con variant='back'."*
