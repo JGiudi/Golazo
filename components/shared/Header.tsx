@@ -1,7 +1,8 @@
 'use client';
 
-import { ArrowLeft, User } from 'lucide-react';
+import { ArrowLeft, User as UserIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useAppContext } from '@/lib/context';
 
 interface HeaderProps {
   variant?: 'home' | 'back';
@@ -10,7 +11,6 @@ interface HeaderProps {
   onBack?: () => void;
   onProfileClick?: () => void;
   showAvatar?: boolean;
-  isLoggedIn?: boolean;
 }
 
 export default function Header({ 
@@ -19,10 +19,10 @@ export default function Header({
   subtitle = 'ENCONTRÁ TU CANCHA',
   onBack,
   onProfileClick,
-  showAvatar = true,
-  isLoggedIn = false
+  showAvatar = true
 }: HeaderProps) {
   const router = useRouter();
+  const { user, isLoggedIn } = useAppContext();
   
   const handleBack = () => {
     if (onBack) {
@@ -51,14 +51,26 @@ export default function Header({
         className="relative cursor-pointer group"
       >
         <div className="w-12 h-12 bg-surface border-2 border-surface-light rounded-full flex items-center justify-center overflow-hidden hover:border-brand/50 transition-colors">
-           {isLoggedIn ? (
+           {isLoggedIn && user?.user_metadata?.avatar_url ? (
              <img 
-               src="https://images.unsplash.com/photo-1599566150163-29194dcaad36?q=80&w=300&auto=format&fit=crop" 
+               src={user.user_metadata.avatar_url} 
                className="w-full h-full object-cover" 
-               alt="Joaquin Profile" 
+               alt="Profile"
+               onError={(e) => {
+                 (e.target as HTMLImageElement).style.display = 'none';
+                 (e.target as HTMLImageElement).parentElement!.innerHTML = `
+                   <div class="w-full h-full bg-brand/20 flex items-center justify-center text-brand font-black italic text-xl leading-none">
+                     ${user?.user_metadata?.nickname?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || '?'}
+                   </div>
+                 `;
+               }}
              />
+           ) : isLoggedIn ? (
+             <div className="w-full h-full bg-brand/20 flex items-center justify-center text-brand font-black italic text-xl leading-none">
+               {user?.user_metadata?.nickname?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase()}
+             </div>
            ) : (
-             <User className="w-6 h-6 text-gray-600" />
+             <UserIcon className="w-6 h-6 text-gray-600" />
            )}
         </div>
         {isLoggedIn && (

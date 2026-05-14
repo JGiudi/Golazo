@@ -1,10 +1,14 @@
-import { createClient } from '@supabase/supabase-js';
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 
 /**
- * Cliente con anon key para uso en servidor (Route Handlers, Server Actions).
- * No persiste sesión de usuario; para auth con cookies conviene @supabase/ssr más adelante.
+ * Cliente de Supabase para uso en el servidor (Server Components, Actions y Route Handlers).
+ * Utiliza @supabase/ssr para gestionar la sesión mediante cookies.
+ * En Next.js 14+, cookies() debe ser esperado asíncronamente.
  */
-export function createServerAnonClient() {
+export async function createClient() {
+  const cookieStore = await cookies();
+
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -14,32 +18,22 @@ export function createServerAnonClient() {
     );
   }
 
-  return createClient(url, anonKey, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-    },
-  });
-}
 
-/**
- * Cliente con service role — solo en servidor, nunca exponer al cliente.
- * Omite RLS; usar con extremo cuidado (webhooks, tareas admin).
- */
-export function createServiceRoleClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!url || !serviceKey) {
-    throw new Error(
-      'Faltan NEXT_PUBLIC_SUPABASE_URL o SUPABASE_SERVICE_ROLE_KEY'
-    );
-  }
-
-  return createClient(url, serviceKey, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
+  return createServerClient(url, anonKey, {
+    cookies: {
+      getAll() {
+        return cookieStore.getAll();
+      },
+      setAll(cookiesToSet) {
+        try {
+          cookiesToSet.forEach(({ name, value, options }) =>
+            cookieStore.set(name, value, options)
+          );
+        } catch {
+          // El método setAll puede ser llamado desde Server Components,
+          // donde no se pueden modificar las cookies. Se ignora el error.
+        }
+      },
     },
   });
 }

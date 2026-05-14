@@ -1,10 +1,8 @@
-import { createClient } from '@supabase/supabase-js';
-
-let browserClient: ReturnType<typeof createClient> | null = null;
+import { createBrowserClient as createSupabaseBrowserClient } from '@supabase/ssr';
 
 /**
- * Cliente Supabase para el navegador (singleton).
- * Usa la anon key; respeta RLS en Supabase.
+ * Cliente de Supabase para uso en el navegador (Client Components).
+ * Utiliza @supabase/ssr para gestionar la persistencia de la sesión mediante cookies.
  */
 export function createBrowserClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -16,9 +14,5 @@ export function createBrowserClient() {
     );
   }
 
-  if (!browserClient) {
-    browserClient = createClient(url, anonKey);
-  }
-
-  return browserClient;
+  return createSupabaseBrowserClient(url, anonKey);
 }
