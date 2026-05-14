@@ -1,26 +1,21 @@
 'use client';
 
-import { MapPin, Search, Trophy, Map as MapIcon, ChevronDown, CloudRain, SlidersHorizontal, User, RefreshCcw } from 'lucide-react';
+import { MapPin, Search, Trophy, Map as MapIcon, ChevronDown, SlidersHorizontal, ChevronLeft, Calendar, Clock, Filter } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Button from '@/components/ui/Button';
 import Header from '@/components/shared/Header';
-import { useAppContext } from '@/lib/context';
-import { useLocationSearch } from '@/hooks/useLocationSearch';
+import CourtCard from '@/components/shared/CourtCard';
+import { useCourts } from '@/hooks/useCourts';
+import { searchLocations, reverseGeocode, LocationResult } from '@/lib/location';
 
 export default function BuscarPage() {
   const router = useRouter();
-  const { isLoggedIn } = useAppContext();
 
-  const categories = ['Todos', 'Futbol 5', 'Futbol 7', 'Padel', 'Futbol 11', 'Tenis', 'Basquet', 'Voley'];
-  const [selectedLocation, setSelectedLocation] = useState('Palermo, Buenos Aires');
+  const [selectedLocation, setSelectedLocation] = useState('Palermo');
   const [isLocationOpen, setIsLocationOpen] = useState(false);
   const [locationSearch, setLocationSearch] = useState('');
-  
-  // Usamos el hook dinámico
-  const { results: locationResults, isLoading: isLocationLoading } = useLocationSearch(locationSearch, 'ar', selectedLocation);
-  
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Todos');
   const [showFilters, setShowFilters] = useState(false);
@@ -28,318 +23,233 @@ export default function BuscarPage() {
     roofed: false,
     synthetic: false,
   });
-  const [dragConstraints, setDragConstraints] = useState({ right: 0, left: 0 });
-  
-  const containerRef = useRef<HTMLDivElement>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const [locations, setLocations] = useState<LocationResult[]>([]);
 
-  const allCourts = [
-    {
-      id: 1,
-      name: 'LA CANCHA DE PALERMO',
-      price: '$12.500',
-      distance: '2.4 km',
-      type: 'Futbol 5',
-      category: 'Futbol 5',
-      location: 'Palermo, Buenos Aires',
-      image: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?q=80&w=800&auto=format&fit=crop',
-      turnsToday: 3,
-      isRoofed: true,
-      isSynthetic: true
-    },
-    {
-      id: 2,
-      name: 'STADIUM BECCAR',
-      price: '$15.000',
-      distance: '1.2 km',
-      type: 'Futbol 7',
-      category: 'Futbol 7',
-      location: 'Beccar, Buenos Aires',
-      image: 'https://images.unsplash.com/photo-1544698310-74ea2d1ef84b?q=80&w=800&auto=format&fit=crop',
-      turnsToday: 5,
-      isRoofed: false,
-      isSynthetic: true
-    },
-    {
-      id: 3,
-      name: 'PADEL HUB PRO',
-      price: '$18.000',
-      distance: '0.8 km',
-      type: 'Padel',
-      category: 'Padel',
-      location: 'San Isidro, Buenos Aires',
-      image: 'https://images.unsplash.com/photo-1626225963770-856bb89371d9?q=80&w=800&auto=format&fit=crop',
-      turnsToday: 2,
-      isRoofed: true,
-      isSynthetic: false
-    },
-    {
-      id: 4,
-      name: 'SAN ISIDRO FOOTBALL',
-      price: '$10.000',
-      distance: '4.5 km',
-      type: 'Futbol 5',
-      category: 'Futbol 5',
-      location: 'San Isidro, Buenos Aires',
-      image: 'https://images.unsplash.com/photo-1543351611-58f69d7c1781?q=80&w=800&auto=format&fit=crop',
-      turnsToday: 4,
-      isRoofed: false,
-      isSynthetic: true
-    }
-  ];
+  const categories = ['Todos', 'Futbol 5', 'Futbol 7', 'Padel', 'Futbol 11', 'Tenis', 'Basquet', 'Voley'];
 
-  const filteredCourts = allCourts.filter(court => {
-    // Para el demo, si la ubicación seleccionada es Palermo o San Isidro o Beccar, mostramos los harcodeados que coincidan.
-    // Si es una nueva (como Campana), mostramos todos o ninguno para el ejemplo.
-    const matchesLocation = selectedLocation.includes(court.location.split(',')[0]) || selectedLocation === court.location;
-    const matchesSearch = court.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                         court.type.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory === 'Todos' || court.category === selectedCategory;
-    const matchesRoofed = !filterConfig.roofed || court.isRoofed;
-    const matchesSynthetic = !filterConfig.synthetic || court.isSynthetic;
-    
-    return matchesLocation && matchesSearch && matchesCategory && matchesRoofed && matchesSynthetic;
+  // Búsqueda dinámica en API de Ubicaciones
+  useEffect(() => {
+    const fetchLocations = async () => {
+      if (locationSearch.length < 3) return;
+      const results = await searchLocations(locationSearch);
+      setLocations(results);
+    };
+
+    const timer = setTimeout(fetchLocations, 400);
+    return () => clearTimeout(timer);
+  }, [locationSearch]);
+
+  const { courts, isLoading } = useCourts({
+    category: selectedCategory,
+    searchQuery,
+    zone: selectedLocation,
+    roofed: filterConfig.roofed,
+    synthetic: filterConfig.synthetic
   });
 
-  useEffect(() => {
-    if (containerRef.current && scrollRef.current) {
-      const containerWidth = containerRef.current.offsetWidth;
-      const scrollWidth = scrollRef.current.scrollWidth;
-      setDragConstraints({ right: 0, left: -(scrollWidth - containerWidth + 32) });
-    }
-  }, []);
+  const handleUseMyLocation = () => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(async (position) => {
+      const { latitude, longitude } = position.coords;
+      const city = await reverseGeocode(latitude, longitude);
+      if (city) {
+        setSelectedLocation(city);
+        setIsLocationOpen(false);
+      }
+    });
+  };
 
   return (
-    <div className="space-y-8">
-      <Header 
-        onProfileClick={() => isLoggedIn ? router.push('/perfil') : router.push('/login')} 
-        showAvatar={true}
-      />
-
-      <div className="space-y-4 relative">
-        {/* Location Dropdown */}
-        <div className="relative">
-          <button 
-            onClick={() => {
-              setIsLocationOpen(!isLocationOpen);
-              if (!isLocationOpen) setLocationSearch('');
-            }}
-            className="w-full bg-surface-light/30 p-4 rounded-xl flex items-center justify-between group hover:bg-surface-light/50 transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              <MapPin className="text-brand w-5 h-5" />
-              <span className="text-sm font-bold text-gray-200">{selectedLocation}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              {isLocationLoading && <RefreshCcw className="w-3 h-3 text-brand animate-spin" />}
-              <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${isLocationOpen ? 'rotate-180' : ''}`} />
-            </div>
+    <div className="min-h-screen bg-bg text-white pb-20">
+      <div className="px-6 py-6 sticky top-0 bg-bg/80 backdrop-blur-xl z-30 border-b border-white/5">
+        <div className="flex items-center gap-4 mb-6">
+          <button onClick={() => router.back()} className="w-10 h-10 bg-surface border border-white/5 rounded-xl flex items-center justify-center">
+            <ChevronLeft className="w-5 h-5" />
           </button>
-          
-          <AnimatePresence>
-            {isLocationOpen && (
-              <>
-                <div 
-                  className="fixed inset-0 z-40" 
-                  onClick={() => setIsLocationOpen(false)} 
-                />
-                <motion.div 
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className="absolute top-full left-0 right-0 mt-2 bg-surface border-2 border-surface-light rounded-2xl overflow-hidden z-50 shadow-2xl flex flex-col max-h-[300px]"
-                >
-                  <div className="p-3 border-b border-surface-light/50">
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 w-4 h-4" />
-                      <input 
-                        type="text"
-                        placeholder="Buscar ciudad o zona..."
-                        autoFocus
-                        value={locationSearch}
-                        onChange={(e) => setLocationSearch(e.target.value)}
-                        className="w-full bg-surface-light/30 border-none py-2 pl-9 pr-4 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-brand/50 text-white placeholder-gray-500"
-                      />
-                    </div>
-                  </div>
+          <h1 className="text-xl font-black italic uppercase tracking-tighter">Buscar Canchas</h1>
+        </div>
 
-                  <div className="overflow-y-auto custom-scrollbar">
-                    {locationResults.length > 0 ? (
-                      locationResults.map((loc) => (
+        <div className="space-y-4">
+          {/* Location Selector */}
+          <div className="relative">
+            <button
+              onClick={() => setIsLocationOpen(!isLocationOpen)}
+              className="w-full bg-surface border-2 border-surface-light p-3.5 rounded-xl flex items-center justify-between group hover:border-brand/50 transition-all"
+            >
+              <div className="flex items-center gap-3">
+                <MapPin className="text-brand w-4 h-4" />
+                <span className="font-bold text-xs italic uppercase">{selectedLocation}</span>
+              </div>
+              <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${isLocationOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            <AnimatePresence>
+              {isLocationOpen && (
+                <>
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    onClick={() => setIsLocationOpen(false)}
+                    className="fixed inset-0 z-40 bg-bg/80 backdrop-blur-sm"
+                  />
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="absolute top-full left-0 right-0 mt-2 bg-surface border-2 border-surface-light rounded-2xl overflow-hidden z-50 shadow-2xl flex flex-col max-h-[350px]"
+                  >
+                    <div className="p-3 space-y-3 border-b border-surface-light/50">
+                      <button
+                        onClick={handleUseMyLocation}
+                        className="w-full flex items-center gap-2 text-brand font-black italic uppercase text-[10px] tracking-widest p-2 hover:bg-brand/10 rounded-lg transition-colors"
+                      >
+                        <MapPin className="w-3 h-3" />
+                        Usar mi ubicación actual
+                      </button>
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 w-4 h-4" />
+                        <input
+                          type="text"
+                          placeholder="Buscar ciudad..."
+                          autoFocus
+                          value={locationSearch}
+                          onChange={(e) => setLocationSearch(e.target.value)}
+                          className="w-full bg-surface-light/30 border-none py-2 pl-9 pr-4 rounded-lg text-sm focus:outline-none text-white"
+                        />
+                      </div>
+                    </div>
+                    <div className="overflow-y-auto">
+                      <button
+                        onClick={() => {
+                          setSelectedLocation('Todas');
+                          setIsLocationOpen(false);
+                        }}
+                        className={`w-full px-5 py-4 text-left text-sm font-bold transition-colors border-b border-surface-light/50 last:border-0 hover:bg-brand/10 ${selectedLocation === 'Todas' ? 'text-brand' : 'text-gray-300'}`}
+                      >
+                        TODAS LAS UBICACIONES
+                      </button>
+                      {locations.map((loc) => (
                         <button
                           key={loc.id}
                           onClick={() => {
-                            const fullLoc = `${loc.nombre}, ${loc.provincia}`;
-                            setSelectedLocation(fullLoc);
+                            setSelectedLocation(loc.name);
                             setIsLocationOpen(false);
+                            setLocationSearch('');
                           }}
-                          className={`w-full px-5 py-4 text-left text-sm font-bold transition-colors border-b border-surface-light/50 last:border-0 hover:bg-brand/10 ${selectedLocation.includes(loc.nombre) ? 'text-brand' : 'text-gray-300'}`}
+                          className={`w-full px-5 py-4 text-left text-sm font-bold transition-colors border-b border-surface-light/50 last:border-0 hover:bg-brand/10 ${selectedLocation === loc.name ? 'text-brand' : 'text-gray-300'}`}
                         >
                           <div className="flex flex-col">
-                            <span>{loc.nombre}</span>
-                            <span className="text-[10px] text-gray-500 uppercase tracking-widest">{loc.provincia}{loc.pais && ` (${loc.pais})`}</span>
+                            <span>{loc.name}</span>
+                            <div className="flex items-center gap-1.5 opacity-50">
+                              {loc.context && (
+                                <span className="text-[8px] uppercase tracking-tighter truncate max-w-[200px]">{loc.context}</span>
+                              )}
+                            </div>
                           </div>
                         </button>
-                      ))
-                    ) : locationSearch.length > 2 ? (
-                      <div className="px-5 py-8 text-center text-gray-500 text-sm italic">
-                        No se encontraron zonas...
-                      </div>
-                    ) : (
-                      <div className="px-5 py-8 text-center text-gray-400 text-xs">
-                        Escribí al menos 3 letras para buscar...
-                      </div>
-                    )}
-                  </div>
-                </motion.div>
-              </>
+                      ))}
+                    </div>
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>
+          </div>
+
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 w-5 h-5" />
+              <input
+                type="text"
+                placeholder="Nombre de la cancha o club..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-surface border-2 border-surface-light py-4 px-12 rounded-xl focus:border-brand focus:outline-none transition-colors italic text-sm"
+              />
+            </div>
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`px-4 rounded-xl border-2 flex items-center justify-center transition-all ${showFilters ? 'bg-brand border-brand text-bg' : 'bg-surface border-surface-light text-gray-400 hover:border-brand/50 hover:text-brand'}`}
+            >
+              <SlidersHorizontal className="w-5 h-5" />
+            </button>
+          </div>
+
+          <AnimatePresence>
+            {showFilters && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="overflow-hidden"
+              >
+                <div className="bg-surface/50 border border-white/5 rounded-2xl p-4 flex gap-4">
+                  <label className="flex items-center gap-3 cursor-pointer group">
+                    <div
+                      onClick={() => setFilterConfig(prev => ({ ...prev, roofed: !prev.roofed }))}
+                      className={`w-10 h-5 rounded-full relative transition-colors ${filterConfig.roofed ? 'bg-brand' : 'bg-surface-light'}`}
+                    >
+                      <div className={`absolute top-1 left-1 w-3 h-3 bg-white rounded-full transition-transform ${filterConfig.roofed ? 'translate-x-5' : ''}`} />
+                    </div>
+                    <span className="text-[10px] font-black uppercase italic tracking-widest text-gray-400 group-hover:text-white transition-colors">Techada</span>
+                  </label>
+
+                  <label className="flex items-center gap-3 cursor-pointer group">
+                    <div
+                      onClick={() => setFilterConfig(prev => ({ ...prev, synthetic: !prev.synthetic }))}
+                      className={`w-10 h-5 rounded-full relative transition-colors ${filterConfig.synthetic ? 'bg-brand' : 'bg-surface-light'}`}
+                    >
+                      <div className={`absolute top-1 left-1 w-3 h-3 bg-white rounded-full transition-transform ${filterConfig.synthetic ? 'translate-x-5' : ''}`} />
+                    </div>
+                    <span className="text-[10px] font-black uppercase italic tracking-widest text-gray-400 group-hover:text-white transition-colors">Sintético</span>
+                  </label>
+                </div>
+              </motion.div>
             )}
           </AnimatePresence>
         </div>
-        
-        <div className="flex gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 w-5 h-5" />
-            <input 
-              type="text" 
-              placeholder="¿Dónde querés jugar hoy?" 
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-surface border-2 border-surface-light py-4 px-12 rounded-xl focus:border-brand focus:outline-none transition-colors italic text-xs md:text-sm"
-            />
-          </div>
-          <button 
-            onClick={() => setShowFilters(!showFilters)}
-            className={`px-4 rounded-xl border-2 flex items-center justify-center transition-all ${showFilters ? 'bg-brand border-brand text-bg' : 'bg-surface border-surface-light text-gray-400 hover:border-brand/50 hover:text-brand'}`}
-          >
-            <SlidersHorizontal className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Filter Quick Tags */}
-        <AnimatePresence>
-          {showFilters && (
-            <motion.div 
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="overflow-hidden"
-            >
-              <div className="flex gap-2 pt-1">
-                 <button 
-                   onClick={() => setFilterConfig({...filterConfig, roofed: !filterConfig.roofed})}
-                   className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-xl border text-[9px] font-black uppercase tracking-widest transition-all ${filterConfig.roofed ? 'bg-brand/10 border-brand text-brand' : 'bg-surface/50 border-surface-light text-gray-500'}`}
-                 >
-                    <CloudRain className="w-3 h-3" />
-                    TECHADAS
-                 </button>
-                 <button 
-                   onClick={() => setFilterConfig({...filterConfig, synthetic: !filterConfig.synthetic})}
-                   className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-xl border text-[9px] font-black uppercase tracking-widest transition-all ${filterConfig.synthetic ? 'bg-brand/10 border-brand text-brand' : 'bg-surface/50 border-surface-light text-gray-500'}`}
-                 >
-                    SINTÉTICO
-                 </button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
 
-      {/* Categories with Drag */}
-      <div className="-mx-6">
-        <div className="relative px-6">
-          <div ref={containerRef} className="overflow-hidden pb-1 cursor-grab active:cursor-grabbing">
-            <motion.div 
-              ref={scrollRef}
-              drag="x"
-              dragConstraints={dragConstraints}
-              dragElastic={0.1}
-              className="flex gap-2 w-max"
+      <div className="px-6 py-8 space-y-8">
+        <div className="flex gap-3 overflow-x-auto pb-2 custom-scrollbar">
+          {categories.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setSelectedCategory(cat)}
+              className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all ${selectedCategory === cat ? 'bg-brand text-bg shadow-[0_0_20px_rgba(0,230,118,0.3)]' : 'bg-surface text-gray-400 hover:bg-surface-light border border-white/5'}`}
             >
-              {categories.map((cat) => (
-                <button 
-                  key={cat}
-                  onClick={() => setSelectedCategory(cat)}
-                  className={`whitespace-nowrap px-5 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all ${selectedCategory === cat ? 'bg-brand text-bg' : 'bg-surface text-gray-500 hover:text-white'}`}
-                >
-                  {cat}
-                </button>
-              ))}
-            </motion.div>
-          </div>
-        </div>
-      </div>
-
-      {/* Featured Section */}
-      <div className="space-y-6">
-        <div className="space-y-1">
-          <h2 className="text-3xl font-black italic uppercase leading-none tracking-tighter">CANCHAS</h2>
-          <h2 className="text-3xl font-black italic uppercase text-brand leading-none tracking-tighter">
-            {searchQuery || selectedCategory !== 'Todos' ? 'ENCONTRADAS' : 'DESTACADAS'}
-          </h2>
+              {cat}
+            </button>
+          ))}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <AnimatePresence mode="popLayout">
-            {filteredCourts.length > 0 ? (
-              filteredCourts.map((court) => (
-                <motion.div 
-                  key={court.id}
-                  layout
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  className="bg-surface rounded-3xl overflow-hidden shadow-2xl group flex flex-col border border-white/5"
-                >
-                  <div className="cursor-pointer" onClick={() => router.push(`/canchas/${court.id}`)}>
-                    <div className="relative aspect-4/3 overflow-hidden">
-                      <img 
-                        src={court.image} 
-                        alt={court.name} 
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-                        referrerPolicy="no-referrer"
-                      />
-                      <div className="absolute top-4 left-4 bg-accent-yellow text-bg text-[9px] font-black px-2.5 py-1 rounded-lg uppercase tracking-tighter">
-                         {court.turnsToday} Turnos hoy
-                      </div>
-                      <div className="absolute inset-0 bg-linear-to-t from-surface via-transparent to-transparent opacity-60" />
-                    </div>
-                    
-                    <div className="p-5 pb-0 space-y-4">
-                      <div className="flex justify-between items-start">
-                        <div className="space-y-1">
-                          <h3 className="text-lg font-black italic uppercase leading-tight tracking-tight">{court.name}</h3>
-                          <div className="flex gap-3">
-                            <div className="flex items-center gap-1 text-[9px] text-gray-500 font-bold uppercase tracking-widest">
-                              <Trophy className="w-2.5 h-2.5" />
-                              {court.type}
-                            </div>
-                            <div className="flex items-center gap-1 text-[9px] text-gray-500 font-bold uppercase tracking-widest">
-                              <MapIcon className="w-2.5 h-2.5" />
-                              {court.distance}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="text-xl font-black text-brand italic tracking-tighter">
-                          {court.price}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="p-5">
-                    <Button fullWidth onClick={() => router.push(`/canchas/${court.id}`)} className="h-12 text-[10px]">
-                      RESERVAR AHORA
-                    </Button>
-                  </div>
-                </motion.div>
+            {isLoading ? (
+              <div className="col-span-full py-20 flex flex-col items-center gap-4">
+                <div className="w-12 h-12 border-4 border-brand border-t-transparent rounded-full animate-spin" />
+                <p className="text-gray-500 font-bold italic animate-pulse tracking-widest text-xs">BUSCANDO CANCHAS...</p>
+              </div>
+            ) : courts.length > 0 ? (
+              courts.map((court) => (
+                <CourtCard key={court.id} court={court} />
               ))
             ) : (
-              <div className="py-20 text-center space-y-4">
-                <p className="text-gray-500 font-bold italic text-sm">No encontramos canchas con esos filtros...</p>
-                <Button variant="outline" onClick={() => { setSearchQuery(''); setSelectedCategory('Todos'); }}>
-                  LIMPIAR FILTROS
-                </Button>
+              <div className="col-span-full py-20 text-center space-y-6">
+                <div className="w-20 h-20 bg-surface border border-white/5 rounded-full flex items-center justify-center mx-auto mb-4 opacity-20">
+                  <Search className="w-10 h-10" />
+                </div>
+                <div className="space-y-2">
+                  <p className="text-gray-400 font-bold italic uppercase tracking-tighter">No encontramos canchas</p>
+                  <Button variant="outline" onClick={() => {
+                    setSelectedCategory('Todos');
+                    setSearchQuery('');
+                    setSelectedLocation('Todas');
+                    setFilterConfig({ roofed: false, synthetic: false });
+                  }}>
+                    LIMPIAR BÚSQUEDA
+                  </Button>
+                </div>
               </div>
             )}
           </AnimatePresence>

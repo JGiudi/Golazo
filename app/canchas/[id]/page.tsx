@@ -7,17 +7,25 @@ import { useRouter } from 'next/navigation';
 import Button from '@/components/ui/Button';
 import Header from '@/components/shared/Header';
 import { useAppContext } from '@/lib/context';
+import { useParams } from 'next/navigation';
+import { useCourt } from '@/hooks/useCourt';
+import { format, addDays, startOfToday } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 export default function CourtDetailPage() {
   const router = useRouter();
+  const params = useParams();
+  const id = params.id as string;
   const { setHasReservation, reservationData, setReservationData, isLoggedIn } = useAppContext();
   
+  const { court, slots, isLoading } = useCourt(id);
+
   // Step 1: Detail, Step 2: Review
   const [step, setStep] = useState<1 | 2>(1);
 
   // Court Detail State
-  const [selectedDay, setSelectedDay] = useState(14);
-  const [selectedTime, setSelectedTime] = useState('21:00');
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [selectedTime, setSelectedTime] = useState('');
   const [isSplitPayment, setIsSplitPayment] = useState(false);
   const [splitCount, setSplitCount] = useState(10);
   const [dragConstraints, setDragConstraints] = useState({ right: 0, left: 0 });
@@ -47,18 +55,35 @@ export default function CourtDetailPage() {
     { icon: ShieldCheck, label: 'Transferencia', color: 'text-brand' },
   ];
 
-  const days = [
-    { label: 'HOY', day: 14, month: 'OCT' },
-    { label: 'MAR', day: 15, month: 'OCT' },
-    { label: 'MIE', day: 16, month: 'OCT' },
-    { label: 'JUE', day: 17, month: 'OCT' },
-    { label: 'VIE', day: 18, month: 'OCT' },
-    { label: 'SAB', day: 19, month: 'OCT' },
-  ];
+  const days = Array.from({ length: 14 }, (_, i) => {
+    const d = addDays(startOfToday(), i);
+    return {
+      label: i === 0 ? 'HOY' : format(d, 'EEE', { locale: es }).toUpperCase(),
+      day: format(d, 'd'),
+      month: format(d, 'MMM', { locale: es }).toUpperCase(),
+      date: d
+    };
+  });
 
-  const times = [
-    '18:00', '19:00', '20:00', '21:00', '22:00', '23:00'
-  ];
+  const availableTimes = (() => {
+    // 1. Obtener el índice del día actual (0-6)
+    const currentDayIndex = selectedDate.getDay();
+    
+    // 2. Buscar el horario para este día en la data de Supabase (dia es un número de 0 a 6)
+    const daySchedule = slots.find(s => Number(s.dia) === currentDayIndex);
+    
+    if (!daySchedule) return [];
+
+    // 3. Generar intervalos de 1 hora entre apertura y cierre
+    const startHour = parseInt(daySchedule.hora_apertura.split(':')[0]);
+    const endHour = parseInt(daySchedule.hora_cierre.split(':')[0]);
+    
+    const generated = [];
+    for (let i = startHour; i < endHour; i++) {
+      generated.push(`${i.toString().padStart(2, '0')}:00`);
+    }
+    return generated;
+  })();
 
   useEffect(() => {
     if (step === 1 && containerRef.current && scrollRef.current) {
@@ -130,19 +155,18 @@ export default function CourtDetailPage() {
                 <div className="absolute bottom-6 left-6 right-6 space-y-2">
                   <div className="flex items-center gap-3">
                     <span className="bg-brand/20 border border-brand/40 px-2.5 py-0.5 rounded text-[9px] font-black text-brand uppercase tracking-widest">
-                      FUTBOL 5
+                      {court?.deporte || 'CARGANDO...'}
                     </span>
                     <span className="text-accent-yellow font-black text-[10px] uppercase tracking-widest">
-                      $12.500 / HORA
+                      ${court?.precio_hora?.toLocaleString('es-AR') || '0'} / HORA
                     </span>
                   </div>
                   <h2 className="text-3xl font-black uppercase leading-none tracking-tighter italic">
-                    LA CANCHA<br />
-                    DE PALERMO
+                    {court?.nombre || 'CARGANDO...'}
                   </h2>
                   <div className="flex items-center gap-2 text-gray-400 text-[10px] font-bold uppercase tracking-widest">
                     <MapPin className="w-3.5 h-3.5 text-brand" />
-                    Serrano 3501, Palermo
+                    {court?.direccion || court?.ciudad || 'Ubicación no disponible'}
                   </div>
                 </div>
               </div>
@@ -195,12 +219,12 @@ export default function CourtDetailPage() {
                   dragConstraints={dragConstraints}
                   className="flex gap-2.5 w-max"
                 >
-                  {days.map((item) => (
+                  {days.map((item, idx) => (
                     <button
-                      key={item.day}
-                      onClick={() => setSelectedDay(item.day)}
+                      key={idx}
+                      onClick={() => setSelectedDate(item.date)}
                       className={`flex-shrink-0 w-16 flex flex-col items-center justify-center py-3 rounded-2xl border transition-all ${
-                        selectedDay === item.day 
+                        format(selectedDate, 'd') === item.day 
                           ? 'bg-brand border-brand text-bg shadow-[0_10px_20px_rgba(0,230,118,0.2)]' 
                           : 'bg-surface border-white/5 text-gray-500 hover:text-white hover:border-white/20'
                       }`}
@@ -216,21 +240,28 @@ export default function CourtDetailPage() {
             {/* Time Selection */}
             <div className="space-y-4">
               <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">HORARIOS DISPONIBLES</h3>
-              <div className="grid grid-cols-3 gap-2.5">
-                {times.map((t) => (
-                  <button
-                    key={t}
-                    onClick={() => setSelectedTime(t)}
-                    className={`py-3.5 rounded-xl text-[10px] font-black transition-all border ${
-                      selectedTime === t 
-                        ? 'bg-accent-yellow border-accent-yellow text-bg' 
-                        : 'bg-surface border-white/5 text-gray-500 hover:text-white hover:border-white/20'
-                    }`}
-                  >
-                    {t} HS
-                  </button>
-                ))}
-              </div>
+              {availableTimes.length > 0 ? (
+                <div className="grid grid-cols-3 gap-2.5">
+                  {availableTimes.map((t) => (
+                    <button
+                      key={t}
+                      onClick={() => setSelectedTime(t)}
+                      className={`py-3.5 rounded-xl text-[10px] font-black transition-all border ${
+                        selectedTime === t 
+                          ? 'bg-accent-yellow border-accent-yellow text-bg' 
+                          : 'bg-surface border-white/5 text-gray-500 hover:text-white hover:border-white/20'
+                      }`}
+                    >
+                      {t} - {(parseInt(t.split(':')[0]) + 1).toString().padStart(2, '0')}:00 HS
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="bg-surface border border-white/5 border-dashed rounded-3xl p-8 text-center space-y-2">
+                  <Clock className="w-8 h-8 text-gray-600 mx-auto opacity-20" />
+                  <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">No hay horarios disponibles</p>
+                </div>
+              )}
             </div>
 
             {/* Payment Methods Info */}
@@ -343,19 +374,19 @@ export default function CourtDetailPage() {
             {/* Venue Hero Card */}
             <div className="relative h-[30vh] w-full overflow-hidden rounded-[40px] shadow-2xl group">
               <img 
-                src="https://images.unsplash.com/photo-1574629810360-7efbbe195018?q=80&w=1200&auto=format&fit=crop" 
-                alt="Venue" 
+                src={court?.image_url || gallery[0]} 
+                alt={court?.nombre || 'Venue'} 
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-[3000ms]"
               />
               <div className="absolute inset-0 bg-linear-to-t from-bg via-bg/40 to-transparent" />
               <div className="absolute top-6 left-6 bg-accent-yellow text-bg text-[10px] font-black px-3 py-1 rounded">
-                FÚTBOL 5
+                {court?.deporte || 'DEPORTE'}
               </div>
               <div className="absolute bottom-6 left-8 space-y-2">
-                <h3 className="text-3xl font-black uppercase italic tracking-tighter leading-none">LA CANCHA DE PALERMO</h3>
+                <h3 className="text-3xl font-black uppercase italic tracking-tighter leading-none">{court?.nombre || 'LA CANCHA'}</h3>
                 <div className="flex items-center gap-2 text-xs font-bold text-gray-300">
                   <MapPin className="w-4 h-4 text-brand" />
-                  Palermo, CABA
+                  {court?.direccion || court?.ciudad || 'Ubicación'}
                 </div>
               </div>
             </div>
@@ -366,14 +397,14 @@ export default function CourtDetailPage() {
                   <Calendar className="w-5 h-5 text-brand" />
                   <div className="space-y-0.5">
                     <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">FECHA</p>
-                    <p className="text-sm font-bold">Hoy, {selectedDay} de Oct</p>
+                    <p className="text-sm font-bold">{format(selectedDate, "eeee, d 'de' MMM", { locale: es })}</p>
                   </div>
               </div>
               <div className="bg-surface/50 border border-surface-light rounded-3xl p-6 flex items-center gap-4">
                   <Clock className="w-5 h-5 text-brand" />
                   <div className="space-y-0.5">
                     <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">HORARIO</p>
-                    <p className="text-sm font-bold">{selectedTime}</p>
+                    <p className="text-sm font-bold">{selectedTime || 'No seleccionado'}</p>
                   </div>
               </div>
             </div>
@@ -387,7 +418,7 @@ export default function CourtDetailPage() {
               <div className="bg-surface border border-surface-light rounded-[32px] p-8 space-y-6">
                   <div className="flex justify-between items-center text-gray-400">
                     <span className="text-sm font-bold">Cancha</span>
-                    <span className="text-sm font-black italic">$12.000</span>
+                    <span className="text-sm font-black italic">${court?.precio_hora?.toLocaleString('es-AR')}</span>
                   </div>
                   <div className="flex justify-between items-center text-gray-400">
                     <span className="text-sm font-bold">Servicio</span>
@@ -396,7 +427,7 @@ export default function CourtDetailPage() {
                   <div className="pt-6 border-t border-surface-light/50 flex justify-between items-end">
                     <span className="text-lg font-black italic tracking-tighter uppercase">TOTAL A PAGAR</span>
                     <span className="text-4xl font-black italic tracking-tighter text-brand shadow-[0_0_20px_rgba(0,230,118,0.2)]">
-                      $12.500
+                      ${((court?.precio_hora || 0) + 500).toLocaleString('es-AR')}
                     </span>
                   </div>
 
@@ -406,7 +437,7 @@ export default function CourtDetailPage() {
                           <Zap className="w-4 h-4 text-brand fill-brand" />
                           <span className="text-xs font-bold text-brand uppercase tracking-widest italic">Pago dividido ({reservationData.splitCount} personas)</span>
                       </div>
-                      <span className="text-xs font-black italic">${(12500 / reservationData.splitCount).toFixed(0)} c/u</span>
+                      <span className="text-xs font-black italic">${(((court?.precio_hora || 0) + 500) / reservationData.splitCount).toFixed(0)} c/u</span>
                     </div>
                   )}
               </div>

@@ -52,3 +52,9 @@ app/auth/test)/
 __tests__/
 vitest.config.ts
 app/auth/test)/
+
+# debug & scratch scripts
+check_db_live.js
+check_db.js
+check_horarios.js
+scratch/
