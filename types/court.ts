@@ -11,7 +11,7 @@ export interface Court {
   turns_available_today?: number;
   distance?: string;
   image_url?: string;
-  active?: number; // 0: inactivo, 1: activo
+  active?: boolean;
   hora_apertura?: string; // Ej: "07:00"
   hora_cierre?: string; // Ej: "23:00"
 }

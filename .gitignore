@@ -34,4 +34,9 @@ yarn-error.log*
 Viejo-NOUSAR/
 Front/
 
-# typescript
+
+# debug & scratch scripts
+check_db_live.js
+check_db.js
+check_horarios.js
+scratch/

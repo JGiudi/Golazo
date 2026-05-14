@@ -23,6 +23,7 @@ export function useCourt(id: string) {
           .from('canchas')
           .select('*')
           .eq('id', id)
+          .eq('active', true)
           .single();
 
         if (courtError) throw courtError;

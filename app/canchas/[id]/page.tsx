@@ -374,19 +374,19 @@ export default function CourtDetailPage() {
             {/* Venue Hero Card */}
             <div className="relative h-[30vh] w-full overflow-hidden rounded-[40px] shadow-2xl group">
               <img 
-                src="https://images.unsplash.com/photo-1574629810360-7efbbe195018?q=80&w=1200&auto=format&fit=crop" 
-                alt="Venue" 
+                src={court?.image_url || gallery[0]} 
+                alt={court?.nombre || 'Venue'} 
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-[3000ms]"
               />
               <div className="absolute inset-0 bg-linear-to-t from-bg via-bg/40 to-transparent" />
               <div className="absolute top-6 left-6 bg-accent-yellow text-bg text-[10px] font-black px-3 py-1 rounded">
-                FÚTBOL 5
+                {court?.deporte || 'DEPORTE'}
               </div>
               <div className="absolute bottom-6 left-8 space-y-2">
-                <h3 className="text-3xl font-black uppercase italic tracking-tighter leading-none">LA CANCHA DE PALERMO</h3>
+                <h3 className="text-3xl font-black uppercase italic tracking-tighter leading-none">{court?.nombre || 'LA CANCHA'}</h3>
                 <div className="flex items-center gap-2 text-xs font-bold text-gray-300">
                   <MapPin className="w-4 h-4 text-brand" />
-                  Palermo, CABA
+                  {court?.direccion || court?.ciudad || 'Ubicación'}
                 </div>
               </div>
             </div>
@@ -437,7 +437,7 @@ export default function CourtDetailPage() {
                           <Zap className="w-4 h-4 text-brand fill-brand" />
                           <span className="text-xs font-bold text-brand uppercase tracking-widest italic">Pago dividido ({reservationData.splitCount} personas)</span>
                       </div>
-                      <span className="text-xs font-black italic">${(12500 / reservationData.splitCount).toFixed(0)} c/u</span>
+                      <span className="text-xs font-black italic">${(((court?.precio_hora || 0) + 500) / reservationData.splitCount).toFixed(0)} c/u</span>
                     </div>
                   )}
               </div>

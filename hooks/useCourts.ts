@@ -28,7 +28,7 @@ export function useCourts(filters: UseCourtsFilters) {
         let query = supabase
           .from('canchas')
           .select('*')
-          .eq('active', 1);
+          .eq('active', true);
 
         // Filtro por deporte
         if (filters.category && filters.category !== 'Todos') {
