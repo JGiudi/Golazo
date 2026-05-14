@@ -35,3 +35,20 @@ Viejo-NOUSAR/
 Front/
 
 # typescript
+.agent-docs/
+.gemini/
+
+# supabase
+supabase/.temp/
+supabase/.env
+supabase/functions/**/.env
+
+# Limpieza de archivos temporales de desarrollo
+hooks/test.ts
+repro_filter.ts
+__tests__/nickname-filter.test.ts
+app/auth/test)/
+
+__tests__/
+vitest.config.ts
+app/auth/test)/

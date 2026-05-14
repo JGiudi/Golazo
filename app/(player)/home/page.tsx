@@ -1,12 +1,13 @@
 'use client';
 
-import { MapPin, Search, Trophy, Map as MapIcon, ChevronDown, CloudRain, SlidersHorizontal, User } from 'lucide-react';
+import { MapPin, Search, Trophy, Map as MapIcon, ChevronDown, CloudRain, SlidersHorizontal, User, RefreshCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Button from '@/components/ui/Button';
 import Header from '@/components/shared/Header';
 import { useAppContext } from '@/lib/context';
+import { useLocationSearch } from '@/hooks/useLocationSearch';
 
 export default function PlayerHomePage() {
   const router = useRouter();
@@ -17,6 +18,10 @@ export default function PlayerHomePage() {
   const [selectedLocation, setSelectedLocation] = useState('Palermo, Buenos Aires');
   const [isLocationOpen, setIsLocationOpen] = useState(false);
   const [locationSearch, setLocationSearch] = useState('');
+
+  // Usamos el hook dinámico
+  const { results: locationResults, isLoading: isLocationLoading } = useLocationSearch(locationSearch, 'ar', selectedLocation);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Todos');
   const [showFilters, setShowFilters] = useState(false);
@@ -24,21 +29,8 @@ export default function PlayerHomePage() {
     roofed: false,
     synthetic: false,
   });
-  const [dragConstraints, setDragConstraints] = useState({ right: 0, left: 0 });
   
   const containerRef = useRef<HTMLDivElement>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
-
-  const locations = [
-    'Palermo, Buenos Aires',
-    'San Isidro, Buenos Aires',
-    'Beccar, Buenos Aires',
-    'Vicente Lopez, Buenos Aires',
-    'Olivos, Buenos Aires',
-    'Martínez, Buenos Aires',
-    'Belgrano, CABA',
-    'Recoleta, CABA'
-  ];
 
   const allCourts = [
     {
@@ -95,12 +87,8 @@ export default function PlayerHomePage() {
     }
   ];
 
-  const filteredLocations = locations.filter(loc => 
-    loc.toLowerCase().includes(locationSearch.toLowerCase())
-  );
-
   const filteredCourts = allCourts.filter(court => {
-    const matchesLocation = court.location === selectedLocation;
+    const matchesLocation = selectedLocation.includes(court.location.split(',')[0]) || selectedLocation === court.location;
     const matchesSearch = court.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                          court.type.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = selectedCategory === 'Todos' || court.category === selectedCategory;
@@ -110,34 +98,11 @@ export default function PlayerHomePage() {
     return matchesLocation && matchesSearch && matchesCategory && matchesRoofed && matchesSynthetic;
   });
 
-  useEffect(() => {
-    if (containerRef.current && scrollRef.current) {
-      const containerWidth = containerRef.current.offsetWidth;
-      const scrollWidth = scrollRef.current.scrollWidth;
-      setDragConstraints({ right: 0, left: -(scrollWidth - containerWidth + 32) });
-    }
-  }, []);
-  
   return (
     <div className="space-y-8">
-      <Header 
-        onProfileClick={() => isLoggedIn ? router.push('/perfil') : router.push('/login')} 
-        isLoggedIn={isLoggedIn} 
-      />
+      <Header />
 
       <div className="space-y-4 relative">
-        {/* Block Overlay for non-logged users */}
-        {isSearchBlocked && (
-          <div 
-            className="absolute inset-0 z-50 cursor-pointer" 
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              router.push('/login');
-            }}
-          />
-        )}
-        
         {/* Location Dropdown */}
         <div className="relative">
           <button 
@@ -151,7 +116,10 @@ export default function PlayerHomePage() {
               <MapPin className="text-brand w-5 h-5" />
               <span className="text-sm font-bold text-gray-200">{selectedLocation}</span>
             </div>
-            <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${isLocationOpen ? 'rotate-180' : ''}`} />
+            <div className="flex items-center gap-2">
+              {isLocationLoading && <RefreshCcw className="w-3 h-3 text-brand animate-spin" />}
+              <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${isLocationOpen ? 'rotate-180' : ''}`} />
+            </div>
           </button>
           
           <AnimatePresence>
@@ -172,7 +140,7 @@ export default function PlayerHomePage() {
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 w-4 h-4" />
                       <input 
                         type="text"
-                        placeholder="Buscar zona..."
+                        placeholder="Buscar ciudad o zona..."
                         autoFocus
                         value={locationSearch}
                         onChange={(e) => setLocationSearch(e.target.value)}
@@ -182,22 +150,30 @@ export default function PlayerHomePage() {
                   </div>
 
                   <div className="overflow-y-auto custom-scrollbar">
-                    {filteredLocations.length > 0 ? (
-                      filteredLocations.map((loc) => (
+                    {locationResults.length > 0 ? (
+                      locationResults.map((loc) => (
                         <button
-                          key={loc}
+                          key={loc.id}
                           onClick={() => {
-                            setSelectedLocation(loc);
+                            const fullLoc = `${loc.nombre}, ${loc.provincia}`;
+                            setSelectedLocation(fullLoc);
                             setIsLocationOpen(false);
                           }}
-                          className={`w-full px-5 py-4 text-left text-sm font-bold transition-colors border-b border-surface-light/50 last:border-0 hover:bg-brand/10 ${selectedLocation === loc ? 'text-brand' : 'text-gray-300'}`}
+                          className={`w-full px-5 py-4 text-left text-sm font-bold transition-colors border-b border-surface-light/50 last:border-0 hover:bg-brand/10 ${selectedLocation.includes(loc.nombre) ? 'text-brand' : 'text-gray-300'}`}
                         >
-                          {loc}
+                          <div className="flex flex-col">
+                            <span>{loc.nombre}</span>
+                            <span className="text-[10px] text-gray-500 uppercase tracking-widest">{loc.provincia}{loc.pais && ` (${loc.pais})`}</span>
+                          </div>
                         </button>
                       ))
-                    ) : (
+                    ) : locationSearch.length > 2 ? (
                       <div className="px-5 py-8 text-center text-gray-500 text-sm italic">
                         No se encontraron zonas...
+                      </div>
+                    ) : (
+                      <div className="px-5 py-8 text-center text-gray-400 text-xs">
+                        Escribí al menos 3 letras para buscar...
                       </div>
                     )}
                   </div>
@@ -258,22 +234,13 @@ export default function PlayerHomePage() {
       {/* Categories with Drag */}
       <div className="-mx-6">
         <div className="relative px-6">
-          {isSearchBlocked && (
-            <div 
-              className="absolute inset-0 z-50 cursor-pointer" 
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                router.push('/login');
-              }}
-            />
-          )}
           <div ref={containerRef} className="overflow-hidden pb-1 cursor-grab active:cursor-grabbing">
             <motion.div 
-              ref={scrollRef}
-              drag="x"
-              dragConstraints={dragConstraints}
-              dragElastic={0.1}
+               
+ 
+              drag="x" 
+              dragConstraints={{ right: 0, left: -340 }} 
+              dragElastic={0.1} 
               className="flex gap-2 w-max"
             >
               {categories.map((cat) => (
@@ -365,40 +332,6 @@ export default function PlayerHomePage() {
           </AnimatePresence>
         </div>
       </div>
-
-      {/* Promo Card - only show if not logged in */}
-      {!isLoggedIn && (
-        <motion.div 
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="bg-surface rounded-3xl p-8 space-y-6 relative overflow-hidden"
-        >
-          <div className="absolute -right-12 -top-12 w-48 h-48 bg-brand/10 blur-3xl rounded-full" />
-          
-          <div className="space-y-1 relative z-10">
-            <h2 className="text-3xl font-black uppercase tracking-tight">TU PROXIMO PARTIDO</h2>
-            <h2 className="text-3xl font-black uppercase text-brand tracking-tight">EMPIEZA ACÁ</h2>
-          </div>
-          
-          <p className="text-gray-400 font-medium leading-relaxed max-w-[80%] relative z-10">
-            Unite a la comunidad deportiva mas grande.
-            Reservá canchas, armá partidos y medí tu rendimiento
-          </p>
-          
-          <div className="flex flex-col items-center gap-4 pt-4 relative z-10">
-            <Button onClick={() => router.push('/registro')} className="w-full">
-              Crear cuenta gratis
-            </Button>
-            <button 
-              onClick={() => router.push('/login')}
-              className="text-xs font-black uppercase tracking-widest text-gray-500 hover:text-brand transition-colors underline underline-offset-4 decoration-surface-light"
-            >
-              Ya tengo cuenta, ingresar
-            </button>
-          </div>
-        </motion.div>
-      )}
     </div>
   );
 }

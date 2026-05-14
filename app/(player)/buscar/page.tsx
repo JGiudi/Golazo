@@ -1,12 +1,13 @@
 'use client';
 
-import { MapPin, Search, Trophy, Map as MapIcon, ChevronDown, CloudRain, SlidersHorizontal, User } from 'lucide-react';
+import { MapPin, Search, Trophy, Map as MapIcon, ChevronDown, CloudRain, SlidersHorizontal, User, RefreshCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Button from '@/components/ui/Button';
 import Header from '@/components/shared/Header';
 import { useAppContext } from '@/lib/context';
+import { useLocationSearch } from '@/hooks/useLocationSearch';
 
 export default function BuscarPage() {
   const router = useRouter();
@@ -16,6 +17,10 @@ export default function BuscarPage() {
   const [selectedLocation, setSelectedLocation] = useState('Palermo, Buenos Aires');
   const [isLocationOpen, setIsLocationOpen] = useState(false);
   const [locationSearch, setLocationSearch] = useState('');
+  
+  // Usamos el hook dinámico
+  const { results: locationResults, isLoading: isLocationLoading } = useLocationSearch(locationSearch, 'ar', selectedLocation);
+  
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Todos');
   const [showFilters, setShowFilters] = useState(false);
@@ -27,17 +32,6 @@ export default function BuscarPage() {
   
   const containerRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-
-  const locations = [
-    'Palermo, Buenos Aires',
-    'San Isidro, Buenos Aires',
-    'Beccar, Buenos Aires',
-    'Vicente Lopez, Buenos Aires',
-    'Olivos, Buenos Aires',
-    'Martínez, Buenos Aires',
-    'Belgrano, CABA',
-    'Recoleta, CABA'
-  ];
 
   const allCourts = [
     {
@@ -94,12 +88,10 @@ export default function BuscarPage() {
     }
   ];
 
-  const filteredLocations = locations.filter(loc => 
-    loc.toLowerCase().includes(locationSearch.toLowerCase())
-  );
-
   const filteredCourts = allCourts.filter(court => {
-    const matchesLocation = court.location === selectedLocation;
+    // Para el demo, si la ubicación seleccionada es Palermo o San Isidro o Beccar, mostramos los harcodeados que coincidan.
+    // Si es una nueva (como Campana), mostramos todos o ninguno para el ejemplo.
+    const matchesLocation = selectedLocation.includes(court.location.split(',')[0]) || selectedLocation === court.location;
     const matchesSearch = court.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                          court.type.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = selectedCategory === 'Todos' || court.category === selectedCategory;
@@ -116,15 +108,12 @@ export default function BuscarPage() {
       setDragConstraints({ right: 0, left: -(scrollWidth - containerWidth + 32) });
     }
   }, []);
-  
-  // Si no está logueado, podríamos redirigir, pero lo dejamos así para no romper.
-  // if (!isLoggedIn) { router.push('/login'); return null; }
 
   return (
     <div className="space-y-8">
       <Header 
         onProfileClick={() => isLoggedIn ? router.push('/perfil') : router.push('/login')} 
-        isLoggedIn={isLoggedIn} 
+        showAvatar={true}
       />
 
       <div className="space-y-4 relative">
@@ -141,7 +130,10 @@ export default function BuscarPage() {
               <MapPin className="text-brand w-5 h-5" />
               <span className="text-sm font-bold text-gray-200">{selectedLocation}</span>
             </div>
-            <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${isLocationOpen ? 'rotate-180' : ''}`} />
+            <div className="flex items-center gap-2">
+              {isLocationLoading && <RefreshCcw className="w-3 h-3 text-brand animate-spin" />}
+              <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${isLocationOpen ? 'rotate-180' : ''}`} />
+            </div>
           </button>
           
           <AnimatePresence>
@@ -162,7 +154,7 @@ export default function BuscarPage() {
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 w-4 h-4" />
                       <input 
                         type="text"
-                        placeholder="Buscar zona..."
+                        placeholder="Buscar ciudad o zona..."
                         autoFocus
                         value={locationSearch}
                         onChange={(e) => setLocationSearch(e.target.value)}
@@ -172,22 +164,30 @@ export default function BuscarPage() {
                   </div>
 
                   <div className="overflow-y-auto custom-scrollbar">
-                    {filteredLocations.length > 0 ? (
-                      filteredLocations.map((loc) => (
+                    {locationResults.length > 0 ? (
+                      locationResults.map((loc) => (
                         <button
-                          key={loc}
+                          key={loc.id}
                           onClick={() => {
-                            setSelectedLocation(loc);
+                            const fullLoc = `${loc.nombre}, ${loc.provincia}`;
+                            setSelectedLocation(fullLoc);
                             setIsLocationOpen(false);
                           }}
-                          className={`w-full px-5 py-4 text-left text-sm font-bold transition-colors border-b border-surface-light/50 last:border-0 hover:bg-brand/10 ${selectedLocation === loc ? 'text-brand' : 'text-gray-300'}`}
+                          className={`w-full px-5 py-4 text-left text-sm font-bold transition-colors border-b border-surface-light/50 last:border-0 hover:bg-brand/10 ${selectedLocation.includes(loc.nombre) ? 'text-brand' : 'text-gray-300'}`}
                         >
-                          {loc}
+                          <div className="flex flex-col">
+                            <span>{loc.nombre}</span>
+                            <span className="text-[10px] text-gray-500 uppercase tracking-widest">{loc.provincia}{loc.pais && ` (${loc.pais})`}</span>
+                          </div>
                         </button>
                       ))
-                    ) : (
+                    ) : locationSearch.length > 2 ? (
                       <div className="px-5 py-8 text-center text-gray-500 text-sm italic">
                         No se encontraron zonas...
+                      </div>
+                    ) : (
+                      <div className="px-5 py-8 text-center text-gray-400 text-xs">
+                        Escribí al menos 3 letras para buscar...
                       </div>
                     )}
                   </div>

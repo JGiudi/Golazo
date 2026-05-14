@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-
 import { createBrowserClient } from '@/lib/supabase/client';
 
 type AuthState = {
@@ -10,36 +9,36 @@ type AuthState = {
 };
 
 /**
- * Hook base para sesiÃ³n Supabase en el cliente.
- * AmplÃ­a con listeners de auth cuando conectes login/registro.
+ * Hook base para sesión Supabase en el cliente.
+ * Mantiene la sesión sincronizada con onAuthStateChange.
  */
 export function useAuth(): AuthState {
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
-    let cancelled = false;
+    const supabase = createBrowserClient();
+    
+    // Carga inicial del usuario
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUserId(user?.id ?? null);
+      setLoading(false);
+    };
 
-    async function run() {
-      try {
-        const supabase = createBrowserClient();
-        const { data } = await supabase.auth.getUser();
-        if (!cancelled) {
-          setUserId(data.user?.id ?? null);
-        }
-      } catch {
-        if (!cancelled) setUserId(null);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
+    void getUser();
 
-    void run();
+    // Listener para cambios de estado (login, logout, token refresh)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUserId(session?.user?.id ?? null);
+      setLoading(false);
+    });
 
     return () => {
-      cancelled = true;
+      subscription.unsubscribe();
     };
   }, []);
 
   return { loading, userId };
 }
+

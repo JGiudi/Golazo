@@ -1,22 +1,25 @@
 'use client';
 
-import { User, Settings, LogOut, ChevronRight, Shield, Bell, HelpCircle, CreditCard, Gamepad2, Info, Trophy } from 'lucide-react';
+import { User as UserIcon, LogOut, ChevronRight, Bell, CreditCard, Gamepad2, Info, Trophy } from 'lucide-react';
 import Header from '@/components/shared/Header';
 import { motion } from 'motion/react';
 import { useRouter } from 'next/navigation';
 import { useAppContext } from '@/lib/context';
+import { signOut } from '@/lib/supabase/actions';
 
 export default function PerfilPage() {
   const router = useRouter();
-  const { setIsLoggedIn } = useAppContext();
+  const { user, refreshSession } = useAppContext();
 
-  const handleLogout = () => {
-    setIsLoggedIn(false);
-    router.push('/home'); // O a discovery
+  const handleLogout = async () => {
+    await signOut();
+    // Forzar actualización del contexto y redirección
+    await refreshSession();
+    router.push('/home');
   };
 
   const menuItems = [
-    { id: 'datos', icon: User, label: 'Mis Datos', color: 'text-brand' },
+    { id: 'datos', icon: UserIcon, label: 'Mis Datos', color: 'text-brand' },
     { id: 'partidos', icon: Trophy, label: 'Mis Partidos', color: 'text-brand' },
     { id: 'notificaciones', icon: Bell, label: 'Notificaciones', color: 'text-brand', badge: '2' },
     { id: 'pago', icon: CreditCard, label: 'Métodos de Pago', color: 'text-brand' },
@@ -25,37 +28,55 @@ export default function PerfilPage() {
   ];
 
   const stats = [
-    { value: '42', label: 'PARTIDOS', border: 'border-brand' },
-    { value: '85', label: 'GOLES', border: 'border-brand' },
-    { value: '98%', label: 'KARMA', border: 'border-accent-yellow' },
+    { value: '0', label: 'PARTIDOS', border: 'border-brand' },
+    { value: '0', label: 'GOLES', border: 'border-brand' },
+    { value: '100%', label: 'KARMA', border: 'border-accent-yellow' },
   ];
+
+  const displayName = user?.user_metadata?.nickname || user?.email?.split('@')[0] || 'USUARIO';
+  const displayLevel = user?.user_metadata?.level || 'PRINCIPIANTE';
 
   return (
     <div className="min-h-screen bg-bg text-white pb-12">
       <Header variant="back" onBack={() => router.back()} title="MI PERFIL" showAvatar={false} />
 
       <div className="px-6 flex flex-col items-center mt-8 space-y-6">
-        {/* Avatar Square Glowing */}
         <div className="relative group">
-          <div className="w-36 h-36 rounded-3xl p-0.5 bg-brand/20 border-2 border-brand shadow-[0_0_40px_rgba(0,230,118,0.2)] overflow-hidden">
-             <img 
-               src="https://images.unsplash.com/photo-1599566150163-29194dcaad36?q=80&w=300&auto=format&fit=crop" 
-               className="w-full h-full object-cover rounded-[22px]" 
-               alt="Joaquin Profile" 
-             />
+          <div className="w-36 h-36 rounded-3xl p-0.5 bg-brand/20 border-2 border-brand shadow-[0_0_40px_rgba(0,230,118,0.2)] overflow-hidden flex items-center justify-center bg-surface">
+             {user?.user_metadata?.avatar_url ? (
+               <img 
+                 src={user.user_metadata.avatar_url} 
+                 className="w-full h-full object-cover rounded-[22px]" 
+                 alt="Profile"
+                 onError={(e) => {
+                   (e.target as HTMLImageElement).style.display = 'none';
+                   (e.target as HTMLImageElement).parentElement!.innerHTML = `
+                     <div class="w-full h-full bg-brand/20 flex items-center justify-center text-brand font-black italic text-5xl leading-none">
+                       ${user?.user_metadata?.nickname?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || '?'}
+                     </div>
+                   `;
+                 }}
+               />
+             ) : (
+               <div className="w-full h-full bg-brand/20 flex items-center justify-center text-brand font-black italic text-5xl leading-none">
+                 {user?.user_metadata?.nickname?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || '?'}
+               </div>
+             )}
           </div>
           <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-accent-yellow text-bg font-black text-[9px] px-4 py-1.5 rounded-full uppercase tracking-[0.2em] shadow-lg">
-             LEYENDA
+             {displayLevel}
           </div>
         </div>
 
-        {/* User Info */}
         <div className="text-center space-y-1 pt-2">
-          <h2 className="text-5xl font-black italic tracking-tighter uppercase text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]">JOAQUÍN</h2>
-          <p className="text-gray-500 font-bold text-xs uppercase tracking-widest italic">Socio #8292-X</p>
+          <h2 className="text-5xl font-black italic tracking-tighter uppercase text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]">
+            {displayName}
+          </h2>
+          <p className="text-gray-500 font-bold text-xs uppercase tracking-widest italic">
+            {user?.email}
+          </p>
         </div>
 
-        {/* Stats Grid */}
         <div className="grid grid-cols-3 gap-4 w-full pt-4">
           {stats.map((stat, i) => (
             <motion.div 
@@ -71,7 +92,6 @@ export default function PerfilPage() {
           ))}
         </div>
 
-        {/* Menu List */}
         <div className="w-full bg-surface/40 border border-surface-light rounded-[32px] overflow-hidden mt-6">
           {menuItems.map((item, index) => (
             <button 
@@ -94,7 +114,6 @@ export default function PerfilPage() {
           ))}
         </div>
 
-        {/* Logout Button */}
         <button 
           onClick={handleLogout}
           className="w-full mt-4 flex items-center justify-center gap-3 py-5 rounded-[24px] border-2 border-red-500/20 bg-red-500/5 text-red-500 font-black text-sm uppercase tracking-[0.2em] hover:bg-red-500/10 transition-all"
